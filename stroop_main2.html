@@ -4,70 +4,152 @@
 <meta charset="UTF-8">
 <title>Main Stroop Task</title>
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    text-align: center;
-    margin-top: 50px;
-  }
-  #word {
-    font-size: 48px;
-    margin: 50px;
-  }
-  #feedback {
-    font-size: 20px;
-    margin-top: 30px;
-  }
+  body { font-family: Arial, sans-serif; text-align: center; margin-top: 40px; }
+  #stroop-container { min-height: 220px; margin: 20px auto; font-size: 48px; outline: none; border-radius: 6px; padding: 20px; width: 80%; max-width: 800px; }
+  #feedback { font-size: 18px; margin-top: 18px; }
+  #start-hint { font-size:14px; color:#666; margin-top:8px; }
 </style>
 </head>
 <body>
-<div id="word"></div>
-<div id="feedback"></div>
+  <div id="stroop-container" tabindex="0">
+    <div id="word"></div>
+  </div>
+  <div id="feedback"></div>
+  <div id="start-hint">If nothing happens, click inside the box or press any key to focus then press R/G/B/Y.</div>
 
 <script>
-const colors = ["red", "green", "blue", "yellow"];
-const keys = {r: "red", g: "green", b: "blue", y: "yellow"};
-const totalTrials = 40;
-let i = 0;
+/* ---------- CONFIG ---------- */
+const DEBUG = true;              // set false to silence console logs
+const colors = ["red","green","blue","yellow"];
+const keys = { r:"red", g:"green", b:"blue", y:"yellow" };
+const TOTAL_TRIALS = 40;         // desired number of main trials
+const ITI = 1000;                // inter-trial interval (ms)
+/* ---------------------------- */
 
-// Arrays to store data
+let trialIndex = 0;
 let words = [], inks = [], pressedKeys = [], correctness = [], rts = [];
 
-function randomChoice(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+const container = document.getElementById("stroop-container");
+const wordEl = document.getElementById("word");
+const feedbackEl = document.getElementById("feedback");
+const hintEl = document.getElementById("start-hint");
 
-function makeTrial() {
+function log(...args){ if(DEBUG) console.log(...args); }
+
+function randomChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function makeTrial(){ 
   const word = randomChoice(colors);
-  const ink = randomChoice(colors.filter(c => c !== word)); // always incongruent
+  const ink = randomChoice(colors.filter(c => c !== word)); // force incongruent
   return { word, ink };
 }
 
-function nextTrial() {
-  if (i >= totalTrials) {
-    const accuracy = (correctness.filter(c => c === 1).length / correctness.length * 100).toFixed(1);
-    const avgRT = Math.round(rts.reduce((a, b) => a + b, 0) / rts.length);
+/* Focus helpers - try to force focus so key events are captured inside iframe */
+function focusContainer(){
+  try {
+    container.focus();
+    // also try to focus window (may or may not succeed in some browsers)
+    if (window.focus) window.focus();
+  } catch(e){ /* ignore */ }
+}
 
-    document.getElementById("word").innerHTML = "Task complete!";
-    document.getElementById("feedback").innerHTML = `
-      <br>Accuracy: ${accuracy}%<br>
-      Average RT: ${avgRT} ms<br>
-      Sending results to Qualtrics...
-    `;
+/* Safety: compute summaries only if we have data */
+function computeSummary() {
+  const n = correctness.length;
+  const correctCount = correctness.filter(c=>c===1).length;
+  const accuracy = n > 0 ? (correctCount / n * 100).toFixed(1) : "0.0";
+  const avgRT = rts.length > 0 ? Math.round(rts.reduce((a,b)=>a+b,0)/rts.length) : 0;
+  return { accuracy, avgRT };
+}
 
-    // Send results to Qualtrics parent
-    window.parent.postMessage({
+/* Start the next trial (main loop) */
+function nextTrial(){
+  // Ensure container is focused before showing stimulus
+  focusContainer();
+
+  if(trialIndex >= TOTAL_TRIALS){
+    log("All trials finished:", trialIndex);
+    const summary = computeSummary();
+    wordEl.innerHTML = "Task complete!";
+    feedbackEl.innerHTML = `<br>Accuracy: ${summary.accuracy}%<br>Average RT: ${summary.avgRT} ms<br>Sending results to Qualtrics...`;
+
+    // Prepare data (pipe-separated)
+    const data = {
       stroop_words: words.join("|"),
       stroop_inks: inks.join("|"),
       stroop_pressed: pressedKeys.join("|"),
       stroop_correct: correctness.join("|"),
       stroop_rt: rts.join("|"),
-      stroop_accuracy: accuracy,
-      stroop_avgRT: avgRT
-    }, "*");
-
+      stroop_accuracy: summary.accuracy,
+      stroop_avgRT: summary.avgRT
+    };
+    log("Posting data to parent:", data);
+    window.parent.postMessage(data, "*");
     return;
   }
 
+  // Prepare trial
   const trial = makeTrial();
-  const wordEl = document.getElementById("word");
-  const feedbackEl =
+  wordEl.innerHTML = `<span style="color:${trial.ink}">${trial.word.toUpperCase()}</span>`;
+  feedbackEl.innerHTML = "";
+  log("Trial start", trialIndex+1, trial);
+
+  const startTime = performance.now();
+
+  // Handler will be attached both to container and document to maximize chance of capture
+  function handler(e){
+    const pressedKey = e.key ? e.key.toLowerCase() : "";
+    if(!keys[pressedKey]) return; // ignore non-target keys
+
+    const rt = Math.round(performance.now() - startTime);
+    const pressedColor = keys[pressedKey];
+    const correct = (pressedColor === trial.ink) ? 1 : 0;
+
+    // Save data
+    words.push(trial.word);
+    inks.push(trial.ink);
+    pressedKeys.push(pressedColor);
+    correctness.push(correct);
+    rts.push(rt);
+
+    log(`Response (trial ${trialIndex+1}): key=${pressedKey}, color=${pressedColor}, correct=${correct}, rt=${rt}`);
+
+    // clear stimulus and remove handlers
+    wordEl.innerHTML = "";
+    try {
+      container.removeEventListener("keydown", handler);
+      document.removeEventListener("keydown", handler);
+    } catch(e){}
+
+    trialIndex++;
+    // ensure focus again for next trial (some browsers blur after keypress)
+    setTimeout(()=>{
+      focusContainer();
+      setTimeout(nextTrial, ITI);
+    }, 0);
+  }
+
+  // Attach once-only handlers (both) to maximize capture reliability
+  container.addEventListener("keydown", handler, { once: true });
+  document.addEventListener("keydown", handler, { once: true });
+  // ensure element has focus so container listener will work
+  focusContainer();
+}
+
+/* Kickoff: ensure focus and start after small delay */
+window.addEventListener("load", () => {
+  log("Iframe loaded, focusing container...");
+  focusContainer();
+  // small extra attempts to focus (some browsers require user gesture)
+  setTimeout(focusContainer, 200);
+  setTimeout(nextTrial, 800);
+});
+
+/* Allow user to click to focus if auto-focus fails */
+container.addEventListener("click", () => {
+  focusContainer();
+  hintEl.style.display = "none";
+  log("Container clicked -> focused");
+});
+</script>
+</body>
+</html>
