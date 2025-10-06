@@ -19,72 +19,68 @@ const keys = {r:"red", g:"green", b:"blue", y:"yellow"};
 const totalTrials = 40;
 let i = 0;
 
-let words = [], inks = [], pressedKeys = [], correctness = [], rts = [];
+const words = [], inks = [], pressedKeys = [], correctness = [], rts = [];
 
 const container = document.getElementById("stroop-container");
 const feedback = document.getElementById("feedback");
 
-// Show initial message
-container.innerHTML = "Get ready for 40 main trials.";
-
-// Use window keydown so it works in Qualtrics iframe
-function nextTrial(){
-    if(i >= totalTrials){
-        container.innerHTML = "Task complete!";
-        feedback.innerHTML = "<br>Sending results to Qualtrics...";
-
-        const data = {
-            stroop_words: words.join("|"),
-            stroop_inks: inks.join("|"),
-            stroop_pressed: pressedKeys.join("|"),
-            stroop_correct: correctness.join("|"),
-            stroop_rt: rts.join("|"),
-            stroop_accuracy: (correctness.filter(c=>c===1).length / correctness.length*100).toFixed(1),
-            stroop_avgRT: Math.round(rts.reduce((a,b)=>a+b,0)/rts.length)
-        };
-
-        window.parent.postMessage(data, "*");
-        return;
-    }
-
-    let trial = makeTrial();
-    container.innerHTML = `<span style="color:${trial.ink}">${trial.word.toUpperCase()}</span>`;
-    feedback.innerHTML = "";
-
-    let start = performance.now();
-
-    function keyHandler(e){
-        let pressed = e.key ? e.key.toLowerCase() : '';
-        if(keys[pressed]){
-            let rt = Math.round(performance.now() - start);
-            let pressedColor = keys[pressed];
-            let correct = (pressedColor === trial.ink) ? 1 : 0;
-
-            words.push(trial.word);
-            inks.push(trial.ink);
-            pressedKeys.push(pressedColor);
-            correctness.push(correct);
-            rts.push(rt);
-
-            container.innerHTML = "";
-            window.removeEventListener("keydown", keyHandler);
-
-            i++;
-            setTimeout(nextTrial, 1000);
-        }
-    }
-
-    window.addEventListener("keydown", keyHandler, { once: true });
-}
-
-// Helper for generating trials
+function randomChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function makeTrial(){
-    let word = colors[Math.floor(Math.random()*colors.length)];
-    let ink = colors.filter(c=>c!==word)[Math.floor(Math.random()*3)];
-    return {word, ink};
+  let word = randomChoice(colors);
+  let ink = randomChoice(colors.filter(c => c !== word));
+  return {word, ink};
 }
 
-// Start trials after short delay to ensure iframe loads
+function nextTrial(){
+  if(i >= totalTrials){
+    container.innerHTML = "Task complete!";
+    feedback.innerHTML = "<br>Sending results to Qualtrics...";
+
+    const data = {
+        stroop_words: words.join("|"),
+        stroop_inks: inks.join("|"),
+        stroop_pressed: pressedKeys.join("|"),
+        stroop_correct: correctness.join("|"),
+        stroop_rt: rts.join("|"),
+        stroop_accuracy: (correctness.filter(c=>c===1).length / correctness.length*100).toFixed(1),
+        stroop_avgRT: Math.round(rts.reduce((a,b)=>a+b,0)/rts.length)
+    };
+
+    window.parent.postMessage(data, "*");
+    return;
+  }
+
+  let trial = makeTrial();
+  container.innerHTML = `<span style="color:${trial.ink}">${trial.word.toUpperCase()}</span>`;
+  feedback.innerHTML = "";
+
+  let start = performance.now();
+
+  function keyHandler(e){
+    let pressed = e.key ? e.key.toLowerCase() : '';
+    if(keys[pressed]){
+      let rt = Math.round(performance.now() - start);
+      let pressedColor = keys[pressed];
+      let correct = (pressedColor === trial.ink) ? 1 : 0;
+
+      words.push(trial.word);
+      inks.push(trial.ink);
+      pressedKeys.push(pressedColor);
+      correctness.push(correct);
+      rts.push(rt);
+
+      container.innerHTML = "";
+      window.removeEventListener("keydown", keyHandler);
+
+      i++;
+      setTimeout(nextTrial, 1000);
+    }
+  }
+
+  window.addEventListener("keydown", keyHandler, { once: true });
+}
+
+container.innerHTML = "Get ready for 40 main trials.";
 setTimeout(nextTrial, 1000);
 </script>
 </body>
