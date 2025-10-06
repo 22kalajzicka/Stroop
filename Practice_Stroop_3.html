@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Practice Stroop</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+  #word { font-size: 48px; margin: 50px; }
+  #feedback { font-size: 20px; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div id="word"></div>
+<div id="feedback"></div>
+
+<script>
+const colors = ["red","green","blue","yellow"];
+const keys = {r:"red", g:"green", b:"blue", y:"yellow"};
+const totalTrials = 5;  // practice
+let i=0;
+
+function randomChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function makeTrial(){ 
+  let word = randomChoice(colors);
+  let ink = randomChoice(colors.filter(c=>c!==word));
+  return {word, ink};
+}
+
+function nextTrial(){
+  if(i >= totalTrials){
+    document.getElementById("word").innerHTML = "Practice complete!";
+    document.getElementById("feedback").innerHTML = "<br>Click Next in Qualtrics to continue.";
+    return;
+  }
+  
+  let trial = makeTrial();
+  document.getElementById("word").innerHTML = `<span style="color:${trial.ink}">${trial.word.toUpperCase()}</span>`;
+  document.getElementById("feedback").innerHTML = "";
+
+  let start = performance.now();
+  
+  function keyHandler(e){
+    let pressed = e.key ? e.key.toLowerCase() : '';
+    if(keys[pressed]){
+      // Word disappears immediately
+      document.getElementById("word").innerHTML = "";
+
+      window.removeEventListener("keydown", keyHandler);
+      i++;
+      
+      // 1-second interval before next trial
+      setTimeout(nextTrial, 1000);
+    }
+  }
+  
+  window.addEventListener("keydown", keyHandler);
+}
+
+nextTrial();
+</script>
+</body>
+</html>
