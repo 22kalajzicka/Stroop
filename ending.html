@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stroop Task Finished</title>
+<style>
+body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+#summary { font-size: 20px; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div id="summary">Thank you for completing the Stroop Task!</div>
+
+<script>
+window.addEventListener("message", function(event){
+    const data = event.data;
+    if(data.stroop_accuracy && data.stroop_avgRT){
+        document.getElementById("summary").innerHTML =
+          `Thank you for completing the Stroop Task!<br>
+          Accuracy: ${data.stroop_accuracy}%<br>
+          Average RT: ${data.stroop_avgRT} ms<br><br>
+          Click Next to continue.`;
+    }
+});
+</script>
+</body>
+</html>
