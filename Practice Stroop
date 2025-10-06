@@ -27,7 +27,7 @@ function makeTrial(){
 }
 
 function nextTrial(){
-  if(i>=totalTrials){
+  if(i >= totalTrials){
     document.getElementById("word").innerHTML = "Practice complete!";
     document.getElementById("feedback").innerHTML = "<br>Click Next in Qualtrics to continue.";
     return;
@@ -35,14 +35,21 @@ function nextTrial(){
   
   let trial = makeTrial();
   document.getElementById("word").innerHTML = `<span style="color:${trial.ink}">${trial.word.toUpperCase()}</span>`;
+  document.getElementById("feedback").innerHTML = "";
+
   let start = performance.now();
   
   function keyHandler(e){
     let pressed = e.key ? e.key.toLowerCase() : '';
     if(keys[pressed]){
+      // Word disappears immediately
+      document.getElementById("word").innerHTML = "";
+
       window.removeEventListener("keydown", keyHandler);
       i++;
-      setTimeout(nextTrial, 1000);  // 1s ITI
+      
+      // 1-second interval before next trial
+      setTimeout(nextTrial, 1000);
     }
   }
   
