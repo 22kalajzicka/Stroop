@@ -5,43 +5,34 @@
 <title>Main Stroop Task</title>
 <style>
 body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-#stroop-container { min-height: 200px; margin: 50px; font-size: 48px; outline: none; }
+#stroop-container { min-height: 200px; margin: 50px; font-size: 48px; }
 #feedback { font-size: 20px; margin-top: 30px; }
 </style>
 </head>
 <body>
-<div id="stroop-container" tabindex="0"></div>
+<div id="stroop-container"></div>
 <div id="feedback"></div>
 
 <script>
 const colors = ["red","green","blue","yellow"];
 const keys = {r:"red", g:"green", b:"blue", y:"yellow"};
-const totalTrials = 40; // 40 trials
+const totalTrials = 40;
 let i = 0;
 
-// Arrays to store results
 let words = [], inks = [], pressedKeys = [], correctness = [], rts = [];
 
 const container = document.getElementById("stroop-container");
 const feedback = document.getElementById("feedback");
 
-// Focus container so key presses work in Qualtrics iframe
-container.focus();
+// Show initial message
+container.innerHTML = "Get ready for 40 main trials.";
 
-// Helper functions
-function randomChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
-function makeTrial(){ 
-    let word = randomChoice(colors);
-    let ink = randomChoice(colors.filter(c => c !== word));
-    return {word, ink};
-}
-
+// Use window keydown so it works in Qualtrics iframe
 function nextTrial(){
     if(i >= totalTrials){
         container.innerHTML = "Task complete!";
         feedback.innerHTML = "<br>Sending results to Qualtrics...";
 
-        // Send data to Qualtrics via postMessage
         const data = {
             stroop_words: words.join("|"),
             stroop_inks: inks.join("|"),
@@ -52,16 +43,13 @@ function nextTrial(){
             stroop_avgRT: Math.round(rts.reduce((a,b)=>a+b,0)/rts.length)
         };
 
-        console.log("Sending data to Qualtrics:", data); // debug
         window.parent.postMessage(data, "*");
         return;
     }
 
-    // Generate new trial
     let trial = makeTrial();
     container.innerHTML = `<span style="color:${trial.ink}">${trial.word.toUpperCase()}</span>`;
     feedback.innerHTML = "";
-    container.focus(); // ensure key presses are captured
 
     let start = performance.now();
 
@@ -72,30 +60,32 @@ function nextTrial(){
             let pressedColor = keys[pressed];
             let correct = (pressedColor === trial.ink) ? 1 : 0;
 
-            // Save trial data
             words.push(trial.word);
             inks.push(trial.ink);
             pressedKeys.push(pressedColor);
             correctness.push(correct);
             rts.push(rt);
 
-            container.innerHTML = ""; // word disappears immediately
+            container.innerHTML = "";
             window.removeEventListener("keydown", keyHandler);
 
-            i++; // increment trial counter
-            setTimeout(nextTrial, 1000); // 1-second ITI
+            i++;
+            setTimeout(nextTrial, 1000);
         }
     }
 
-    // Add listener to container and focus
-    container.addEventListener("keydown", keyHandler, { once: true });
-    container.focus();
+    window.addEventListener("keydown", keyHandler, { once: true });
 }
 
-// Start message
-container.innerHTML = "Get ready for 40 main trials.";
-setTimeout(nextTrial, 1000);
+// Helper for generating trials
+function makeTrial(){
+    let word = colors[Math.floor(Math.random()*colors.length)];
+    let ink = colors.filter(c=>c!==word)[Math.floor(Math.random()*3)];
+    return {word, ink};
+}
 
+// Start trials after short delay to ensure iframe loads
+setTimeout(nextTrial, 1000);
 </script>
 </body>
 </html>
