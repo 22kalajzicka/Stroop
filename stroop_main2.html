@@ -31,7 +31,7 @@ function makeTrial(){
 const container = document.getElementById("stroop-container");
 const feedback = document.getElementById("feedback");
 
-// Focus container for Qualtrics iframe
+// Focus container so key presses work in Qualtrics iframe
 container.focus();
 
 function nextTrial(){
@@ -50,6 +50,7 @@ function nextTrial(){
             stroop_avgRT: Math.round(rts.reduce((a,b)=>a+b,0)/rts.length)
         };
 
+        console.log("Sending data to Qualtrics:", data); // debug
         window.parent.postMessage(data, "*");
         return;
     }
@@ -67,7 +68,6 @@ function nextTrial(){
             let pressedColor = keys[pressed];
             let correct = (pressedColor === trial.ink) ? 1 : 0;
 
-            // Save trial data
             words.push(trial.word);
             inks.push(trial.ink);
             pressedKeys.push(pressedColor);
